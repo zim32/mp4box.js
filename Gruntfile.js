@@ -73,22 +73,21 @@ module.exports = function(grunt) {
       },
     },
     qunit: {
-		all: {
-		  options: {
-		    urls: [
-		      'http://localhost:9000/test/qunit.html'
-		    ]
-		  }
-		}
+  		all: {
+  		  options: {
+          timeout: 30000,
+          "--web-security": "no",
+          coverage: {
+            src: [ "dist/<%= pkg.name %>.all.js" ],
+            instrumentedFiles: "temp/",
+            htmlReport: "build/report/coverage",
+            lcovReport: "build/report/lcov",
+            linesThresholdPct: 0
+          }
+  		  },
+        src: [ "test/qunit.html"]
+  		}
     },
-    connect: {
-	    server: {
-	      options: {
-	        port: 9000,
-	        base: '.'
-	      }
-	    }
-  	},
   	jshint: {
       files: [
         'Gruntfile.js', 
@@ -123,21 +122,29 @@ module.exports = function(grunt) {
         files:  ['package.json'],
         pushTo: 'origin'
       }
-    }
+    },
+    coveralls: {
+      options: {
+        // dont fail if coveralls fails
+        force: true
+      },
+      main_target: {
+        src: "build/report/lcov/lcov.info"
+      }
+    },
   });
 
   grunt.loadNpmTasks('grunt-contrib-uglify');
   grunt.loadNpmTasks('grunt-contrib-jshint');
-  grunt.loadNpmTasks('grunt-contrib-qunit');
   grunt.loadNpmTasks('grunt-contrib-watch');
   grunt.loadNpmTasks('grunt-contrib-concat');
-  grunt.loadNpmTasks('grunt-contrib-connect');
   grunt.loadNpmTasks('grunt-karma');
   grunt.loadNpmTasks('grunt-bump');
-
+  grunt.loadNpmTasks("grunt-coveralls");
+  grunt.loadNpmTasks("grunt-qunit-istanbul");
+  
   grunt.registerTask('all', [ 'concat:all', 'uglify:all']);
   grunt.registerTask('simple', [ 'concat:simple', 'uglify:simple']);
   grunt.registerTask('default', [ 'jshint', 'all', 'simple']);
-  grunt.registerTask('test', ['default', 'karma']);
-
+  grunt.registerTask('test', ['default', 'qunit', 'coveralls']);
 };
