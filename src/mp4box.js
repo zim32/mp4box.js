@@ -38,6 +38,8 @@ var MP4Box = function (_keepMdatData) {
 	this.nextMoofNumber = 0;
 	/* Boolean indicating if the initial list of items has been produced */
 	this.itemListBuilt = false;
+	/* Samples involved in segmentation */
+	this.samplesInvolved = {};
 }
 
 MP4Box.prototype.setSegmentOptions = function(id, user, options) {
@@ -166,14 +168,16 @@ MP4Box.prototype.processSamples = function() {
 	if (this.isFragmentationInitialized && this.onSegment !== null) {
 		for (i = 0; i < this.fragmentedTracks.length; i++) {
 			var fragTrak = this.fragmentedTracks[i];
-			var samplesInvolved = [];
+			if(!this.samplesInvolved[i]){
+				this.samplesInvolved[i] = [];
+			}
 			
 			trak = fragTrak.trak;
 			while (trak.nextSample < trak.samples.length && this.sampleProcessingStarted) {				
 				/* The sample information is there (either because the file is not fragmented and this is not the last sample, 
 				or because the file is fragmented and the moof for that sample has been received */
 				Log.debug("MP4Box", "Creating media fragment on track #"+fragTrak.id +" for sample "+trak.nextSample); 
-				var result = this.createFragment(this.inputIsoFile, fragTrak.id, trak.nextSample, fragTrak.segmentStream, samplesInvolved);
+				var result = this.createFragment(this.inputIsoFile, fragTrak.id, trak.nextSample, fragTrak.segmentStream, this.samplesInvolved[i]);
 				if (result) {
 					fragTrak.segmentStream = result;
 					trak.nextSample++;
@@ -183,15 +187,17 @@ MP4Box.prototype.processSamples = function() {
 				}
 				/* A fragment is created by sample, but the segment is the accumulation in the buffer of these fragments.
 				   It is flushed only as requested by the application (nb_samples) to avoid too many callbacks */
-				if (trak.nextSample % fragTrak.nb_samples === 0 || trak.nextSample >= trak.samples.length) {
-					Log.info("MP4Box", "Sending fragmented data on track #"+fragTrak.id+" for samples ["+Math.max(0,trak.nextSample-fragTrak.nb_samples)+","+(trak.nextSample-1)+"]"); 
+
+				// if (trak.nextSample % fragTrak.nb_samples === 0 || trak.nextSample >= trak.samples.length) {
+				if (trak.nextSample % fragTrak.nb_samples === 0) {
+					Log.info("MP4Box", "Sending fragmented data on track #"+fragTrak.id+" for samples ["+Math.max(0,trak.nextSample-fragTrak.nb_samples)+","+(trak.nextSample-1)+"]");
 					Log.info("MP4Box", "Sample data size in memory: "+this.inputIsoFile.getAllocatedSampleDataSize()); 			
 					if (this.onSegment) {
-						this.onSegment(fragTrak.id, fragTrak.user, fragTrak.segmentStream.buffer, trak.nextSample, samplesInvolved);
+						this.onSegment(fragTrak.id, fragTrak.user, fragTrak.segmentStream.buffer, trak.nextSample, this.samplesInvolved[i]);
 					}
 					/* force the creation of a new buffer */
 					fragTrak.segmentStream = null;
-					samplesInvolved = [];
+					this.samplesInvolved[i] = [];
 					if (fragTrak !== this.fragmentedTracks[i]) {
 						/* make sure we can stop fragmentation if needed */
 						break;
